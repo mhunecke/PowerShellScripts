@@ -25,18 +25,17 @@
     interruption, loss of business information, or other pecuniary loss) arising out of the use of or inability to use
     the sample scripts or documentation, even if Microsoft has been advised of the possibility of such damages.
 
-    FileName:       .\CompareUPNs.ps1
+    FileName:       .\CompareUPN_Azure_with_AD.ps1
     Author:         Marcelo Hunecke - Customer Engineer
-    Creation date:  Aug 1oth, 2023
-    last update:    Aug 16th, 2023
-    Version:        1.3
-
+    Creation date:  Aug 10th, 2023
+    Last update:    Aug 21st, 2023
+    Version:        1.4
 #>
 
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
-$NeedToChangeOnPremiseUPN = "CompareUPN_Azure_NeedToChangeOnPremiseUPN_" + $DateTime + ".txt"
-$NeedToRunPowerShell = "CompareUPN_Azure_NeedToRunPowerShell_" + $DateTime + ".txt"
-$logName = "CompareUPN_Azure_Log_" +  $DateTime + ".txt"
+$RunOnPremises = "CompareUPN_Azure_with_AD_RunOnPremises_" + $DateTime + ".txt"
+$RunOnCloud = "CompareUPN_Azure_with_AD_RunOnCloud_" + $DateTime + ".txt"
+$logName = "CompareUPN_Azure_with_AD_ExecutionLog_" +  $DateTime + ".txt"
 
 #---------------------------------------------------------------------
 # Write the log
@@ -71,8 +70,8 @@ function ConnectAzureAD
         {
             Write-Debug "Get-AzureADDirectoryRole -ErrorAction stop"
             $testConnection = Get-AzureADDirectoryRole -ErrorAction stop | Out-Null #if true (Already Connected)
-            Write-Host "You are now connected to Microsoft Azure AD..."
-            log -Status "INFORMATION" -Message "You are now connected to Microsoft Azure AD..."
+            Write-Host "You are already connected to Microsoft Azure AD..."
+            log -Status "INFORMATION" -Message "You are already connected to Microsoft Azure AD..."
         }
         catch
             {
@@ -96,7 +95,7 @@ function ConnectAzureAD
                                 catch
                                     {
                                         write-Debug $error[0].Exception
-                                        write-host "Couldn't connect to Microsoft Azure AD. Exiting."
+                                        Write-Host "Couldn't connect to Microsoft Azure AD. Exiting."
                                         log -Status "Error" -Message "Couldn't connect to Microsoft AD. Exiting."
                                         Exit
                                     }
@@ -105,153 +104,67 @@ function ConnectAzureAD
             }
 }
 
-#---------------------------------------------------------------------
-# Connect to MSGraph
-#---------------------------------------------------------------------
-function ConnectMSGraph
-{
-    try 
-        {
-            Write-Debug "Get-MgUser -ErrorAction stop"
-            $testConnection = Get-MgUser -ErrorAction stop | Out-Null #if true (Already Connected)
-            Write-Host "You are now connected to Microsoft Graph..."
-            log -Status "INFORMATION" -Message "You are now connected to Microsoft Graph..."
-        }
-        catch
-            {
-                try
-                    {
-                        write-Debug $error[0].Exception
-                        Write-Host "Connecting to Microsoft Graph..."
-                        log -Status "INFORMATION" -Message "Connecting to Microsoft Graph..."
-                        Connect-Graph -Scopes "User.Read.All" -ErrorAction stop | Out-Null
-                    }
-                    catch    
-                        {
-                            try
-                                {
-                                    write-Debug $error[0].Exception
-                                    Write-Host "Installing Microsoft Graph PowerShell Module..."
-                                    log -Status "INFORMATION" -Message "Installing Microsoft Graph PowerShell Module..."
-                                    Install-Module Microsoft.Graph -Force -AllowClobber
-                                    Connect-Graph -Scopes "User.Read.All" -ErrorAction stop | Out-Null
-                                }
-                                catch
-                                    {
-                                        write-Debug $error[0].Exception
-                                        Write-Host "Couldn't connect to Microosft Graph. Exiting."
-                                        log -Status "Error" -Message "Couldn't connect to Microosft Graph. Exiting."
-                                        Exit
-                                    }
-                       
-                        }
-            }
-}
-
-#---------------------------------------------------------------------
-# Connect to Microsoft Online
-#---------------------------------------------------------------------
-function ConnectMsol
-{
-    try 
-        {
-            Write-Debug "Get-MSOLCompanyInformation -ErrorAction stop"
-            $testConnection = Get-MSOLCompanyInformation -ErrorAction stop | Out-Null #if true (Already Connected)
-            Write-Host "You are now connected to Microsoft Online..."
-            log -Status "INFORMATION" -Message "You are now connected to Microsoft Online..."
-        }
-        catch
-            {
-                try
-                    {
-                        write-Debug $error[0].Exception
-                        Write-Host "Connecting to Microsoft Online..."
-                        log -Status "INFORMATION" -Message "Connecting to Microsoft Online..."
-                        Connect-MSOLService -ErrorAction stop | Out-Null
-                    }
-                    catch    
-                        {
-                            try
-                                {
-                                    write-Debug $error[0].Exception
-                                    Write-Host "Installing Microsoft Online PowerShell Module..."
-                                    log -Status "INFORMATION" -Message Write-Host "Installing Microsoft Online PowerShell Module..."
-                                    Install-Module MSOnline -Force -AllowClobber -ErrorAction stop | Out-Null
-                                    Connect-MSOLService -ErrorAction stop | Out-Null
-                                }
-                                catch
-                                    {
-                                        write-Debug $error[0].Exception
-                                        Write-Host "Couldn't connect to  Microsoft Online. Exiting."
-                                        log -Status "Error" -Message "Couldn't connect to  Microsoft Online. Exiting."
-                                        exit
-                                    }
-                    
-                        }
-            }
-}
-
 Clear-Host
+#[Net.ServicePointManager]::SecurityProtocol += [Net.SecurityProtocolType]::Tls12
+#[Net.ServicePointManager]::SecurityProtocol
 $dateTime = Get-Date -Format dd/MM/yyyy-HH:mm:ss;Write-Host $dateTime
 log -Status "INFORMATION" -Message "..:: STARTED ::.."
 
 ConnectAzureAD
 
-$UserCounter = 0
-$CountDelete = 0
-"#Run these cmlets on Active Directory PowerShell" | out-file $NeedToChangeOnPremiseUPN
-"#---------------------------------------------------------------------------" | out-file -append $NeedToChangeOnPremiseUPN
-"#Run these cmlets on Microsoft Online PowerShell | Connect-AzureAD" | out-file $NeedToRunPowerShell
-write-host "Reading Azure AD Users...."
-log -Status "INFORMATION" -Message "Reading Azure Active Directory Users....relax...."
+$TotalUsersCounter = 0
+$CountToChange = 0
+"#Run these cmlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
+"#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
+"#Run these cmlets on Azure AD PowerShell | Connect-AzureAD" | out-file $RunOnCloud
+Write-Host "Reading Azure AD Users... (wait around 5 minutes for each 10k users) !!"
+log -Status "INFORMATION" -Message "Reading Azure AD Users... (wait around 5 minutes for each 10k users) !!"
 $allAzureADusers = Get-AzureADUser -all:$true | Where-Object {($_.DirSyncEnabled -eq $true) -and ($_.UserType -eq "Member")}  | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier, DisplayName, OnPremisesDistinguishedName
 $allAzureADusersCount = $allAzureADusers.count
 
 foreach ($allAzureADuser in $allAzureADusers)
-    {
-        
-        $UserCounter++
-        $PercentComplete = ($UserCounter / $allAzureADusersCount) * 100
-        Write-Progress -Activity 'Reading user attributes...' -Status "$UserCounter users of $allAzureADusersCount users already checked." -PercentComplete $PercentComplete
+    { 
+        $TotalUsersCounter++
+        $PercentComplete = ($TotalUsersCounter / $allAzureADusersCount) * 100
+        Write-Progress -Activity 'Reading user attributes...' -Status "$TotalUsersCounter users of $allAzureADusersCount users already checked." -PercentComplete $PercentComplete
         
         $allAzureADuser_UPN = $allAzureADuser.UserPrincipalName
         $allAzureADuser_ObjectID = $allAzureADuser.ObjectID
         $allAzureADuser_OnPremSID = $allAzureADuser.OnPremisesSecurityIdentifier
         $allAzureADuser_DisplayName = $allAzureADuser.DisplayName
-        #Write-Host $allAzureADuser_UPN
-        #Write-Host $allAzureADuser_ObjectID
-        #Write-Host $allAzureADuser_ImmutableID
-        #Write-Host $allAzureADuser_ObjectGUID
-        #Write-Host $allAzureADuser_DisplayName
-        
         try
             {
                 $allADOnPremUser = Get-ADUser -identity $allAzureADuser_OnPremSID -Properties ObjectGUID | select-object UserPrincipalName, ObjectGUID # -ErrorAction Stop
-                $allADOnPremUser_UPN = $allADOnPremUser.userprincipalname
-                $allADOnPremUser_ObjectGUID = $allADOnPremUser.ObjectGUID
             }
             catch
                 {
-                    $CountDelete++
-                    write-host
-                    write-host "#",$CountDelete
-                    write-host "Azure AD Display Name --------> ", $allAzureADuser_DisplayName -ForegroundColor Cyan
-                    Write-host "Azure AD current UPN ---------> ", $allAzureADuser_UPN -ForegroundColor Cyan
-                    #Write-host "Microsoft Graph DN -----------> ", $allAzureAdUserExtension_OnPremDN -ForegroundColor Cyan
-                    Write-Host "Active Directory ObjectGUID --> ", $allAzureADuser_ObjectGUID -ForegroundColor Cyan
-                    "Get-ADUser -Identity '" + $allAzureADuser_DisplayName + "'" | out-file -append $NeedToChangeOnPremiseUPN
-                    "Get-ADUser -Identity '" + $allAzureADuser_UPN + "'" | out-file -append $NeedToChangeOnPremiseUPN
-                    #"Get-ADUser -Identity '" + $allAzureAdUserExtension_OnPremDN + "'" | out-file -append $NeedToChangeOnPremiseUPN
-                    "Get-ADUser -Identity '" + $allAzureADuser_OnPremSID + "'" | out-file -append $NeedToChangeOnPremiseUPN
-                    "#---------------------------------------------------------------------------" | out-file -append $NeedToChangeOnPremiseUPN
-                    write-host "Action: Run the the following cmdlet on Azure AD PowerShell:" -ForegroundColor Yellow
-                    write-host "Remove-AzureADuser -ObjectID", $allAzureADuser_ObjectID
-                    "Remove-AzureADuser -ObjectID " + $allAzureADuser_ObjectID | out-file -append $NeedToRunPowerShell
-                }
+                    $CountToChange++
+                    Write-Host
+                    Write-Host "#",$CountToChange
+                    Write-Host "Azure AD Display Name --------> ", $allAzureADuser_DisplayName -ForegroundColor Cyan
+                    Write-Host "Azure AD current UPN ---------> ", $allAzureADuser_UPN -ForegroundColor Cyan
+                    "Get-ADUser -Identity '" + $allAzureADuser_DisplayName + "'" | out-file -append $RunOnPremises
+                    "Get-ADUser -Identity '" + $allAzureADuser_UPN + "'" | out-file -append $RunOnPremises
+                    "Get-ADUser -Identity '" + $allAzureADuser_OnPremSID + "'" | out-file -append $RunOnPremises
+                    "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
+                    Write-Host "Action: Run the the following cmdlet on Azure AD PowerShell:" -ForegroundColor Yellow
+                    Write-Host "Remove-AzureADuser -ObjectID", $allAzureADuser_ObjectID
+                    "Remove-AzureADuser -ObjectID " + $allAzureADuser_ObjectID | out-file -append $RunOnCloud
 
-               
+                    log -Status "INFORMATION" -Message ""
+                    log -Status "INFORMATION" -Message "Azure AD Display Name --------> ", $allAzureADuser_DisplayName
+                    log -Status "INFORMATION" -Message "Azure AD current UPN ---------> ", $allAzureADuser_UPN
+                    log -Status "INFORMATION" -Message "Get-ADUser -Identity '" + $allAzureADuser_DisplayName + "'"
+                    log -Status "INFORMATION" -Message "Get-ADUser -Identity '" + $allAzureADuser_UPN + "'"
+                    log -Status "INFORMATION" -Message "Get-ADUser -Identity '" + $allAzureADuser_OnPremSID + "'"
+                    log -Status "INFORMATION" -Message "#---------------------------------------------------------------------------"
+                    log -Status "INFORMATION" -Message "Action: Run the the following cmdlet on Azure AD PowerShell:"
+                    log -Status "INFORMATION" -Message "Remove-AzureADuser -ObjectID"
+                    log -Status "INFORMATION" -Message "Remove-AzureADuser -ObjectID " + $allAzureADuser_ObjectID
+                }
     }
-write-host 
+
+Write-Host 
 Write-Host "Script finished successfully !!" -ForegroundColor Yellow
 log -Status "INFORMATION" -Message "Script finished successfully !!"
 log -Status "INFORMATION" -Message "..:: COMPLETED ::.."
