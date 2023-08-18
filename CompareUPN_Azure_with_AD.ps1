@@ -33,12 +33,10 @@
 
 #>
 
-$GADC = "ADWDC04P01.gerdau.net"
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
 $NeedToChangeOnPremiseUPN = "CompareUPN_Azure_NeedToChangeOnPremiseUPN_" + $DateTime + ".txt"
 $NeedToRunPowerShell = "CompareUPN_Azure_NeedToRunPowerShell_" + $DateTime + ".txt"
 $logName = "CompareUPN_Azure_Log_" +  $DateTime + ".txt"
-$DomainToReplace = "gerdau.com"
 
 #---------------------------------------------------------------------
 # Write the log
@@ -194,15 +192,10 @@ function ConnectMsol
 }
 
 Clear-Host
-#[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-#[Net.ServicePointManager]::SecurityProtocol += [Net.SecurityProtocolType]::Tls12
-#[Net.ServicePointManager]::SecurityProtocol
 $dateTime = Get-Date -Format dd/MM/yyyy-HH:mm:ss;Write-Host $dateTime
 log -Status "INFORMATION" -Message "..:: STARTED ::.."
 
 ConnectAzureAD
-#ConnectMSGraph
-#ConnectMsol
 
 $UserCounter = 0
 $CountDelete = 0
@@ -210,12 +203,8 @@ $CountDelete = 0
 "#---------------------------------------------------------------------------" | out-file -append $NeedToChangeOnPremiseUPN
 "#Run these cmlets on Microsoft Online PowerShell | Connect-AzureAD" | out-file $NeedToRunPowerShell
 write-host "Reading Azure AD Users...."
-log -Status "INFORMATION" -Message "Reading Active Directory Users...."
-#$allAzureADusers = Get-AzureADUser -All $true | select-object UserPrincipalName, ObjectID
-
-#$allAzureADusers = Get-AzureADUser -searchstring "Microsoft" | Where-Object {($_.DirSyncEnabled -eq $true) -and ($_.UserType -eq "Member")}  | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier, DisplayName, OnPremisesDistinguishedName
+log -Status "INFORMATION" -Message "Reading Azure Active Directory Users....relax...."
 $allAzureADusers = Get-AzureADUser -all:$true | Where-Object {($_.DirSyncEnabled -eq $true) -and ($_.UserType -eq "Member")}  | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier, DisplayName, OnPremisesDistinguishedName
-
 $allAzureADusersCount = $allAzureADusers.count
 
 foreach ($allAzureADuser in $allAzureADusers)
@@ -228,8 +217,6 @@ foreach ($allAzureADuser in $allAzureADusers)
         $allAzureADuser_UPN = $allAzureADuser.UserPrincipalName
         $allAzureADuser_ObjectID = $allAzureADuser.ObjectID
         $allAzureADuser_OnPremSID = $allAzureADuser.OnPremisesSecurityIdentifier
-        #$allAzureADuser_ImmutableID = $allAzureADuser.ImmutableID
-        #$allAzureADuser_ObjectGUID = [Guid]([System.Convert]::FromBase64String($allAzureADuser_ImmutableID))
         $allAzureADuser_DisplayName = $allAzureADuser.DisplayName
         #Write-Host $allAzureADuser_UPN
         #Write-Host $allAzureADuser_ObjectID
@@ -237,23 +224,11 @@ foreach ($allAzureADuser in $allAzureADusers)
         #Write-Host $allAzureADuser_ObjectGUID
         #Write-Host $allAzureADuser_DisplayName
         
-
-        #Get-AzureADUSerExtension -ObjectID $allAzureADuser_ObjectID | select-object OnPremisesDistinguishedName | Out-Null
-        #$allAzureAdUserExtension_OnPremDN = $allAzureAdUserExtension.OnPremisesDistinguishedName
-
-        #$allGraphsuser = Get-MgUser -UserId $allAzureADuser_ObjectID -Property OnPremisesUserPrincipalName, OnPremisesDistinguishedName | select-object OnPremisesUserPrincipalName, OnPremisesDistinguishedName #-ErrorAction Stop
-        #$allGraphsuser_DN = $allGraphsuser.OnPremisesDistinguishedName
-        #$allGraphsuser_UPN = $allGraphsuser.OnPremisesUserPrincipalName
-        #Write-host $allGraphsuser_DN -ForegroundColor Yellow
-        #Write-host $allGraphsuser_UPN -ForegroundColor Yellow
-
         try
             {
                 $allADOnPremUser = Get-ADUser -identity $allAzureADuser_OnPremSID -Properties ObjectGUID | select-object UserPrincipalName, ObjectGUID # -ErrorAction Stop
                 $allADOnPremUser_UPN = $allADOnPremUser.userprincipalname
                 $allADOnPremUser_ObjectGUID = $allADOnPremUser.ObjectGUID
-                #Write-host $allADOnPremUser_UPN -ForegroundColor Green
-                #Write-host $allADOnPremUser_ObjectGUID -ForegroundColor Green
             }
             catch
                 {

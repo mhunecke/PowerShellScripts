@@ -33,12 +33,12 @@
 
 #>
 
-$GADC = "ADWDC04P01.gerdau.net"
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
 $NeedToChangeOnPremiseUPN = "CompareUPN_AD_with_Azure_NeedToChangeOnPremiseUPN_" + $DateTime + ".txt"
 $NeedToRunPowerShell = "CompareUPN_AD_with_Azure_NeedToRunPowerShell_" + $DateTime + ".txt"
 $logName = "CompareUPN_Log_" +  $DateTime + ".txt"
-$DomainToReplace = "gerdau.com"
+$DomainToReplace = "contoso.com"
+#also update line 205
 
 #---------------------------------------------------------------------
 # Write the log
@@ -194,8 +194,6 @@ function ConnectMsol
 }
 
 Clear-Host
-#[Net.ServicePointManager]::SecurityProtocol += [Net.SecurityProtocolType]::Tls12
-#[Net.ServicePointManager]::SecurityProtocol
 $dateTime = Get-Date -Format dd/MM/yyyy-HH:mm:ss;Write-Host $dateTime
 log -Status "INFORMATION" -Message "..:: STARTED ::.."
 
@@ -204,7 +202,7 @@ $UserCounter = 0
 "Run these cmlets on Microsoft Online PowerShell | Connect-MSOL" | out-file $NeedToRunPowerShell
 write-host "Reading Active Directory Users...."
 log -Status "INFORMATION" -Message "Reading Active Directory Users...."
-$allADusers = Get-ADUser -filter * -SearchBase ' vDC=gerdau,DC=net' -Server $GADC -Properties Mail, DisplayName | where-object {$_.mail -ne $null} | select-object DisplayName, DistinguishedName, UserPrincipalName, objectGUID
+$allADusers = Get-ADUser -filter * -SearchBase 'DC=contoso,DC=com' -Properties Mail, DisplayName | where-object {$_.mail -ne $null} | select-object DisplayName, DistinguishedName, UserPrincipalName, objectGUID
 $allADusersCount = $allADusers.count
 
 ConnectAzureAD
@@ -260,9 +258,6 @@ foreach ($allADuser in $allADusers)
                                     }
                             }
 
-                        #Write-Host $allAzureuser_UPN -ForegroundColor Red
-                        #Write-Host $isAcceptedDomain -ForegroundColor Red
-                        #if (($allAzureuser_UPN -like "*.onmicrosoft.com") -and ($isAcceptedDomain -eq $False))
                         if ($isAcceptedDomain -eq $False)
                             {
                                 $NewUPN = $allADuser_UPN.split("@")[0] + "@" + $DomainToReplace
@@ -278,7 +273,6 @@ foreach ($allADuser in $allADusers)
                                     "Set-MsolUserPrincipalName -UserPrincipalName " + $allAzureuser_UPN + " -NewUserPrincipalName " + $allGraphsuser_UPN | out-file -append $NeedToRunPowerShell
                                 }
                     }
-
 
             }
             catch
