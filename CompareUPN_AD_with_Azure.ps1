@@ -29,18 +29,14 @@
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
     Last update:    Aug 21st, 2023
-    Version:        1.4
+    Version:        1.41
 #>
 
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
 $RunOnPremises = "CompareUPN_AD_with_Azure_RunOnPremises_" + $DateTime + ".txt"
 $RunOnCloud = "CompareUPN_AD_with_Azure_RunOnCloud_" + $DateTime + ".txt"
 $logName = "CompareUPN_AD_with_Azure_ExecutionLog_" +  $DateTime + ".txt"
-
-#Advanced OnPremises Active Directory variable
-$FQDN_DC = "ADWDC04P01.gerdau.net" #FQDN of the OnPremises Active Directory Domain Controller
-$Domain_OU_DN = "DC=gerdau,DC=net" #OU Distinguished Name of the OnPremises Active Directory Domain
-$DomainToReplace = "gerdau.com" #Domain to replace the current UPN
+$DomainToReplace = "contoso.com" #Domain to replace the current UPN
 
 #---------------------------------------------------------------------
 # Write the log
@@ -211,11 +207,15 @@ ConnectMsol
 
 $TotalUsersCounter = 0
 "Run these cmlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
+"Replace the contoso.com domain by your desired domain (must be a Microsoft 365 accepted domain)" | out-file $RunOnPremises
 "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
 "Run these cmlets on Microsoft Online PowerShell | Connect-MSOL" | out-file $RunOnCloud
 Write-Host "Reading OnPremises Active Directory Users...."
 log -Status "INFORMATION" -Message "Reading OnPremises Active Directory Users...."
-$allADusers = Get-ADUser -filter * -SearchBase $Domain_OU_DN -Server $FQDN_DC -Properties Mail, DisplayName, DistinguishedName, UserPrincipalName, objectGUID, objectSid | where-object {$_.mail -ne $null} | select-object DisplayName, DistinguishedName, UserPrincipalName, objectGUID, objectSid
+#$FQDN_DC = "dc01.contoso.net" #FQDN of the OnPremises Active Directory Domain Controller
+#$Domain_OU_DN = "DC=contoso,DC=net" #OU Distinguished Name of the OnPremises Active Directory Domain
+#$allADusers = Get-ADUser -filter * -SearchBase $Domain_OU_DN -Server $FQDN_DC -Properties Mail, DisplayName, DistinguishedName, UserPrincipalName, objectGUID, objectSid | where-object {$_.mail -ne $null} | select-object DisplayName, DistinguishedName, UserPrincipalName, objectGUID, objectSid
+$allADusers = Get-ADUser -filter * -Properties Mail, DisplayName, DistinguishedName, UserPrincipalName, objectGUID, objectSid | where-object {$_.mail -ne $null} | select-object DisplayName, DistinguishedName, UserPrincipalName, objectGUID, objectSid
 $allADusersCount = $allADusers.count
 
 $AzureADDomains = Get-AzureADDomain | select-object Name
