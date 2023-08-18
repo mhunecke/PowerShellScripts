@@ -1,8 +1,8 @@
 ﻿<#
 .Synopsis
-    Script to compare the UPN from OnPremises AD with Azure AD
+    Script to compare the UPN from OnPremises Active Directory with Azure AD
 .DESCRIPTION
-    Script to compare the UPN from OnPremises AD with Azure AD
+    Script to compare the UPN from OnPremises Active Directory with Azure AD
 
     Disclaimer:
     ===========
@@ -26,7 +26,7 @@
     the sample scripts or documentation, even if Microsoft has been advised of the possibility of such damages.
 
     FileName:       .\CompareUPN_AD_with_Azure.ps1
-    Author:         Marcelo Hunecke - Customer Engineer
+    Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
     Last update:    Aug 21st, 2023
     Version:        1.4
@@ -37,10 +37,10 @@ $RunOnPremises = "CompareUPN_AD_with_Azure_RunOnPremises_" + $DateTime + ".txt"
 $RunOnCloud = "CompareUPN_AD_with_Azure_RunOnCloud_" + $DateTime + ".txt"
 $logName = "CompareUPN_AD_with_Azure_ExecutionLog_" +  $DateTime + ".txt"
 
-#Advanced variable (Use just in case you know this paremeters)
-$FQDN_DC = "ADWDC04P01.gerdau.net"
-$Domain_OU_DN = "DC=gerdau,DC=net"
-$DomainToReplace = "gerdau.com"
+#Advanced OnPremises Active Directory variable
+$FQDN_DC = "ADWDC04P01.gerdau.net" #FQDN of the OnPremises Active Directory Domain Controller
+$Domain_OU_DN = "DC=gerdau,DC=net" #OU Distinguished Name of the OnPremises Active Directory Domain
+$DomainToReplace = "gerdau.com" #Domain to replace the current UPN
 
 #---------------------------------------------------------------------
 # Write the log
@@ -75,8 +75,8 @@ function ConnectAzureAD
         {
             Write-Debug "Get-AzureADDirectoryRole -ErrorAction stop"
             $testConnection = Get-AzureADDirectoryRole -ErrorAction stop | Out-Null #if true (Already Connected)
-            Write-Host "You are already connected to Microsoft Azure AD..."
-            log -Status "INFORMATION" -Message "You are already connected to Microsoft Azure AD..."
+            Write-Host "You are already connected to Microsoft Azure AD."
+            log -Status "INFORMATION" -Message "You are already connected to Microsoft Azure AD."
         }
         catch
             {
@@ -118,8 +118,8 @@ function ConnectMSGraph
         {
             Write-Debug "Get-MgUser -ErrorAction stop"
             $testConnection = Get-MgUser -ErrorAction stop | Out-Null #if true (Already Connected)
-            Write-Host "You are already connected to Microsoft Graph..."
-            log -Status "INFORMATION" -Message "You are already connected to Microsoft Graph..."
+            Write-Host "You are already connected to Microsoft Graph."
+            log -Status "INFORMATION" -Message "You are already connected to Microsoft Graph."
         }
         catch
             {
@@ -162,7 +162,7 @@ function ConnectMsol
             Write-Debug "Get-MSOLCompanyInformation -ErrorAction stop"
             $testConnection = Get-MSOLCompanyInformation -ErrorAction stop | Out-Null #if true (Already Connected)
             Write-Host "You are already connected to Microsoft Online..."
-            log -Status "INFORMATION" -Message "You are already connected to Microsoft Online..."
+            log -Status "INFORMATION" -Message "You are already connected to Microsoft Online."
         }
         catch
             {
@@ -170,7 +170,7 @@ function ConnectMsol
                     {
                         write-Debug $error[0].Exception
                         Write-Host "Connecting to Microsoft Online..."
-                        log -Status "INFORMATION" -Message "Connecting to Microsoft Online..."
+                        log -Status "INFORMATION" -Message "Connecting to Microsoft Online."
                         Connect-MSOLService -ErrorAction stop | Out-Null
                     }
                     catch    
@@ -194,6 +194,10 @@ function ConnectMsol
                         }
             }
 }
+
+#---------------------------------------------------------------------
+# Script start here
+#---------------------------------------------------------------------
 
 Clear-Host
 #[Net.ServicePointManager]::SecurityProtocol += [Net.SecurityProtocolType]::Tls12

@@ -1,8 +1,8 @@
 ﻿<#
 .Synopsis
-    Script to compare the UPN from Azure AD and OnPremises AD
+    Script to compare the UPN from Azure AD and OnPremises Active Directory
 .DESCRIPTION
-    Script to compare the UPN from Azure AD and OnPremises AD
+    Script to compare the UPN from Azure AD and OnPremises Active Directory
 
     Disclaimer:
     ===========
@@ -26,7 +26,7 @@
     the sample scripts or documentation, even if Microsoft has been advised of the possibility of such damages.
 
     FileName:       .\CompareUPN_Azure_with_AD.ps1
-    Author:         Marcelo Hunecke - Customer Engineer
+    Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
     Last update:    Aug 21st, 2023
     Version:        1.4
@@ -70,8 +70,8 @@ function ConnectAzureAD
         {
             Write-Debug "Get-AzureADDirectoryRole -ErrorAction stop"
             $testConnection = Get-AzureADDirectoryRole -ErrorAction stop | Out-Null #if true (Already Connected)
-            Write-Host "You are already connected to Microsoft Azure AD..."
-            log -Status "INFORMATION" -Message "You are already connected to Microsoft Azure AD..."
+            Write-Host "You are already connected to Microsoft Azure AD."
+            log -Status "INFORMATION" -Message "You are already connected to Microsoft Azure AD."
         }
         catch
             {
@@ -104,6 +104,10 @@ function ConnectAzureAD
             }
 }
 
+#---------------------------------------------------------------------
+# Script start here
+#---------------------------------------------------------------------
+
 Clear-Host
 #[Net.ServicePointManager]::SecurityProtocol += [Net.SecurityProtocolType]::Tls12
 #[Net.ServicePointManager]::SecurityProtocol
@@ -117,8 +121,8 @@ $CountToChange = 0
 "#Run these cmlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
 "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
 "#Run these cmlets on Azure AD PowerShell | Connect-AzureAD" | out-file $RunOnCloud
-Write-Host "Reading Azure AD Users... (wait around 5 minutes for each 10k users) !!"
-log -Status "INFORMATION" -Message "Reading Azure AD Users... (wait around 5 minutes for each 10k users) !!"
+Write-Host "Reading Azure AD Users... (wait around 10 minutes for each 10k Azure AD users) !!"
+log -Status "INFORMATION" -Message "Reading Azure AD Users... (wait around 10 minutes for each 10k Azure AD users) !!"
 $allAzureADusers = Get-AzureADUser -all:$true | Where-Object {($_.DirSyncEnabled -eq $true) -and ($_.UserType -eq "Member")}  | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier, DisplayName, OnPremisesDistinguishedName
 $allAzureADusersCount = $allAzureADusers.count
 
