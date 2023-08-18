@@ -230,7 +230,6 @@ foreach ($allADuser in $allADusers)
         $allADuser_DisplayName = $allADuser.DisplayName
         $allADuser_UPN = $allADuser.UserPrincipalName
         $allADuser_Sid = $allADuser.objectSid
-        write-host $allADuser_Sid -ForegroundColor Blue
         
         Try
             {
