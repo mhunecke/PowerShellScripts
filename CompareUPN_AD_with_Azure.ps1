@@ -206,6 +206,7 @@ ConnectMSGraph
 ConnectMsol
 
 $TotalUsersCounter = 0
+$CountToChange = 0
 "Run these cmlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
 "Replace the contoso.com domain by your desired domain (must be a Microsoft 365 accepted domain)" | out-file -append $RunOnPremises
 "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
@@ -222,14 +223,14 @@ $allADusersCount = $allADusers.count
 $AzureADDomains = Get-AzureADDomain | select-object Name
 foreach ($allADuser in $allADusers)
     {
-        $TotalUsersCounter = 0
-        $CountToChange = 0
+        $TotalUsersCounter++
         $PercentComplete = ($TotalUsersCounter / $allADusersCount) * 100
         Write-Progress -Activity 'Reading user attributes...' -Status "$TotalUsersCounter users of $allADusersCount users already checked." -PercentComplete $PercentComplete
 
         $allADuser_DisplayName = $allADuser.DisplayName
         $allADuser_UPN = $allADuser.UserPrincipalName
         $allADuser_Sid = $allADuser.objectSid
+        write-host $allADuser_Sid -ForegroundColor Blue
         
         Try
             {
