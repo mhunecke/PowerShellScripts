@@ -207,9 +207,10 @@ ConnectMsol
 
 $TotalUsersCounter = 0
 "Run these cmlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
-"Replace the contoso.com domain by your desired domain (must be a Microsoft 365 accepted domain)" | out-file $RunOnPremises
+"Replace the contoso.com domain by your desired domain (must be a Microsoft 365 accepted domain)" | out-file -append $RunOnPremises
 "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
 "Run these cmlets on Microsoft Online PowerShell | Connect-MSOL" | out-file $RunOnCloud
+"#---------------------------------------------------------------------------" | out-file -append $RunOnCloud
 Write-Host "Reading OnPremises Active Directory Users...."
 log -Status "INFORMATION" -Message "Reading OnPremises Active Directory Users...."
 #$FQDN_DC = "dc01.contoso.net" #FQDN of the OnPremises Active Directory Domain Controller

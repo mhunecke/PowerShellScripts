@@ -121,6 +121,7 @@ $CountToChange = 0
 "#Run these cmlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
 "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
 "#Run these cmlets on Azure AD PowerShell | Connect-AzureAD" | out-file $RunOnCloud
+"#---------------------------------------------------------------------------" | out-file -append $RunOnCloud
 Write-Host "Reading Azure AD Users... (wait around 10 minutes for each 10k Azure AD users) !!"
 log -Status "INFORMATION" -Message "Reading Azure AD Users... (wait around 10 minutes for each 10k Azure AD users) !!"
 $allAzureADusers = Get-AzureADUser -all:$true | Where-Object {($_.DirSyncEnabled -eq $true) -and ($_.UserType -eq "Member")}  | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier, DisplayName, OnPremisesDistinguishedName
