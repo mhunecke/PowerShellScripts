@@ -235,6 +235,7 @@ foreach ($allADuser in $allADusers)
             {
                 $allAzureuser = Get-AzureADUser -Filter "OnPremisesSecurityIdentifier eq 'allADuser_Sid'" | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier #-ErrorAction Stop
                 $allAzureuser_UPN = $allAzureuser.userprincipalname
+                allAzureuser_ObjectID = $allAzureuser.ObjectID
 
                 $allGraphsuser = Get-MgUser -UserId $allAzureuser_ObjectID -Property OnPremisesUserPrincipalName | select-object OnPremisesUserPrincipalName -ErrorAction Stop
                 $allGraphsuser_UPN = $allGraphsuser.OnPremisesUserPrincipalName
