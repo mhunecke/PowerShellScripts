@@ -1,8 +1,8 @@
 ﻿<#
 .Synopsis
-    Script to compare the UPN from Azure AD and OnPremises Active Directory
+    Script to compare the UPN from Azure AD and OnPremises Active Directory.
 .DESCRIPTION
-    Script to compare the UPN from Azure AD and OnPremises Active Directory
+    Script to compare the UPN from Azure AD and OnPremises Active Directory.
 
     Disclaimer:
     ===========
