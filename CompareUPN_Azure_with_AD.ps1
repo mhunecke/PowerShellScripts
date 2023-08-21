@@ -29,7 +29,7 @@
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
     Last update:    Aug 21st, 2023
-    Version:        1.41
+    Version:        1.42
 #>
 
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss

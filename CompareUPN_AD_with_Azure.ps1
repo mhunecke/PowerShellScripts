@@ -29,7 +29,7 @@
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
     Last update:    Aug 21st, 2023
-    Version:        1.41
+    Version:        1.42
 #>
 
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
@@ -208,7 +208,7 @@ ConnectMsol
 $TotalUsersCounter = 0
 $CountToChange = 0
 "Run these cmlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
-"Replace the contoso.com domain by your desired domain (must be a Microsoft 365 accepted domain)" | out-file -append $RunOnPremises
+"IMPORTANT: Replace the <contoso.com> string by your desired domain (must be a Microsoft 365 accepted domain)" | out-file -append $RunOnPremises
 "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
 "Run these cmlets on Microsoft Online PowerShell | Connect-MSOL" | out-file $RunOnCloud
 "#---------------------------------------------------------------------------" | out-file -append $RunOnCloud
@@ -229,13 +229,13 @@ foreach ($allADuser in $allADusers)
 
         $allADuser_DisplayName = $allADuser.DisplayName
         $allADuser_UPN = $allADuser.UserPrincipalName
-        $allADuser_Sid = $allADuser.objectSid
+        $allADuser_Sid = $allADuser.objectSid.value
         
         Try
             {
-                $allAzureuser = Get-AzureADUser -Filter "OnPremisesSecurityIdentifier eq 'allADuser_Sid'" | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier #-ErrorAction Stop
+                $allAzureuser = Get-AzureADUser -Filter "OnPremisesSecurityIdentifier eq '$allADuser_Sid'" | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier #-ErrorAction Stop
                 $allAzureuser_UPN = $allAzureuser.userprincipalname
-                allAzureuser_ObjectID = $allAzureuser.ObjectID
+                $allAzureuser_ObjectID = $allAzureuser.ObjectID
 
                 $allGraphsuser = Get-MgUser -UserId $allAzureuser_ObjectID -Property OnPremisesUserPrincipalName | select-object OnPremisesUserPrincipalName -ErrorAction Stop
                 $allGraphsuser_UPN = $allGraphsuser.OnPremisesUserPrincipalName
