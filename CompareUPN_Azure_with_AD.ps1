@@ -29,7 +29,7 @@
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
     Last update:    Aug 21st, 2023
-    Version:        1.42
+    Version:        1.43
 #>
 
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
@@ -118,9 +118,9 @@ ConnectAzureAD
 
 $TotalUsersCounter = 0
 $CountToChange = 0
-"#Run these cmlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
+"#Run these cmdlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
 "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
-"#Run these cmlets on Azure AD PowerShell | Connect-AzureAD" | out-file $RunOnCloud
+"#Run these cmdlets on Azure AD PowerShell | Connect-AzureAD" | out-file $RunOnCloud
 "#---------------------------------------------------------------------------" | out-file -append $RunOnCloud
 Write-Host "Reading Azure AD Users... (wait around 10 minutes for each 10k Azure AD users) !!"
 log -Status "INFORMATION" -Message "Reading Azure AD Users... (wait around 10 minutes for each 10k Azure AD users) !!"
@@ -145,7 +145,7 @@ foreach ($allAzureADuser in $allAzureADusers)
                 {
                     $CountToChange++
                     Write-Host
-                    Write-Host "#",$CountToChange
+                    Write-Host "#", $CountToChange
                     Write-Host "Azure AD Display Name --------> ", $allAzureADuser_DisplayName -ForegroundColor Cyan
                     Write-Host "Azure AD current UPN ---------> ", $allAzureADuser_UPN -ForegroundColor Cyan
                     "Get-ADUser -Identity '" + $allAzureADuser_DisplayName + "'" | out-file -append $RunOnPremises
@@ -157,20 +157,18 @@ foreach ($allAzureADuser in $allAzureADusers)
                     "Remove-AzureADuser -ObjectID " + $allAzureADuser_ObjectID | out-file -append $RunOnCloud
 
                     log -Status "INFORMATION" -Message ""
+                    log -Status "INFORMATION" -Message "#", $CountToChange
                     log -Status "INFORMATION" -Message "Azure AD Display Name --------> ", $allAzureADuser_DisplayName
                     log -Status "INFORMATION" -Message "Azure AD current UPN ---------> ", $allAzureADuser_UPN
-                    log -Status "INFORMATION" -Message "Get-ADUser -Identity '" + $allAzureADuser_DisplayName + "'"
-                    log -Status "INFORMATION" -Message "Get-ADUser -Identity '" + $allAzureADuser_UPN + "'"
-                    log -Status "INFORMATION" -Message "Get-ADUser -Identity '" + $allAzureADuser_OnPremSID + "'"
-                    log -Status "INFORMATION" -Message "#---------------------------------------------------------------------------"
                     log -Status "INFORMATION" -Message "Action: Run the the following cmdlet on Azure AD PowerShell:"
-                    log -Status "INFORMATION" -Message "Remove-AzureADuser -ObjectID"
-                    log -Status "INFORMATION" -Message "Remove-AzureADuser -ObjectID " + $allAzureADuser_ObjectID
+                    log -Status "INFORMATION" -Message "Remove-AzureADuser -ObjectID", $allAzureADuser_ObjectID
                 }
     }
 
 Write-Host 
 Write-Host "Script finished successfully !!" -ForegroundColor Yellow
+log -Status "INFORMATION" -Message ""
 log -Status "INFORMATION" -Message "Script finished successfully !!"
 log -Status "INFORMATION" -Message "..:: COMPLETED ::.."
-$dateTime = Get-Date -Format dd/MM/yyyy-HH:mm:ss;Write-Host $dateTime
+$dateTime = Get-Date -Format dd/MM/yyyy-HH:mm:ss
+Write-Host $dateTime

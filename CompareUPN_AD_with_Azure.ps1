@@ -29,7 +29,7 @@
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
     Last update:    Aug 21st, 2023
-    Version:        1.42
+    Version:        1.43
 #>
 
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
@@ -207,17 +207,17 @@ ConnectMsol
 
 $TotalUsersCounter = 0
 $CountToChange = 0
-"Run these cmlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
-"IMPORTANT: Replace the <contoso.com> string by your desired domain (must be a Microsoft 365 accepted domain)" | out-file -append $RunOnPremises
+"#Run these cmdlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
+"#IMPORTANT: Replace the <contoso.com> string by your desired domain (must be a Microsoft 365 accepted domain)" | out-file -append $RunOnPremises
 "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
-"Run these cmlets on Microsoft Online PowerShell | Connect-MSOL" | out-file $RunOnCloud
+"#Run these cmdlets on Microsoft Online PowerShell | Connect-MSOL" | out-file $RunOnCloud
 "#---------------------------------------------------------------------------" | out-file -append $RunOnCloud
 Write-Host "Reading OnPremises Active Directory Users...."
 log -Status "INFORMATION" -Message "Reading OnPremises Active Directory Users...."
 #$FQDN_DC = "dc01.contoso.net" #FQDN of the OnPremises Active Directory Domain Controller
 #$Domain_OU_DN = "DC=contoso,DC=net" #OU Distinguished Name of the OnPremises Active Directory Domain
-#$allADusers = Get-ADUser -filter * -SearchBase $Domain_OU_DN -Server $FQDN_DC -Properties Mail, DisplayName, DistinguishedName, UserPrincipalName, objectGUID, objectSid | where-object {$_.mail -ne $null} | select-object DisplayName, DistinguishedName, UserPrincipalName, objectGUID, objectSid
-$allADusers = Get-ADUser -filter * -Properties Mail, DisplayName, DistinguishedName, UserPrincipalName, objectGUID, objectSid | where-object {$_.mail -ne $null} | select-object DisplayName, DistinguishedName, UserPrincipalName, objectGUID, objectSid
+#$allADusers = Get-ADUser -filter * -SearchBase $Domain_OU_DN -Server $FQDN_DC -Properties Mail, DisplayName, UserPrincipalName, objectSid | where-object {$_.mail -ne $null} | select-object DisplayName, UserPrincipalName, objectSid
+$allADusers = Get-ADUser -filter * -Properties Mail, DisplayName, UserPrincipalName, objectSid | where-object {$_.mail -ne $null} | select-object DisplayName, UserPrincipalName, objectSid
 $allADusersCount = $allADusers.count
 
 $AzureADDomains = Get-AzureADDomain | select-object Name
@@ -244,13 +244,13 @@ foreach ($allADuser in $allADusers)
                     {
                         $CountToChange++
                         Write-Host
-                        Write-Host "#",$CountToChange
+                        Write-Host "#", $CountToChange
                         Write-Host "Display Name ---------------> ", $allADuser_DisplayName -ForegroundColor Cyan
                         Write-Host "Azure AD current UPN -------> ", $allAzureuser_UPN -ForegroundColor Cyan
                         Write-Host "Graph OnPremises UPN -------> ", $allGraphsuser_UPN -ForegroundColor Cyan
                         
-                        log -Status "INFORMATION" -Message " "
-                        log -Status "INFORMATION" -Message "#",$CountToChange
+                        log -Status "INFORMATION" -Message ""
+                        log -Status "INFORMATION" -Message "#", $CountToChange
                         log -Status "INFORMATION" -Message "Display Name ---------------> ", $allADuser_DisplayName
                         log -Status "INFORMATION" -Message "Azure AD current UPN -------> ", $allAzureuser_UPN
                         log -Status "INFORMATION" -Message "Graph OnPremises UPN -------> ", $allGraphsuser_UPN
@@ -269,13 +269,13 @@ foreach ($allADuser in $allADusers)
                             {
                                 $NewUPN = $allADuser_UPN.split("@")[0] + "@" + $DomainToReplace
                                 Write-Host "Action: Run the the following cmdlet on OnPremises Active Directory Powershell:" -ForegroundColor Yellow
-                                Write-Host  "Set-Aduser -identity", $allADuser_GUID, "-UserPrincipalName", $NewUPN
+                                Write-Host  "Set-Aduser -identity", $allADuser_Sid, "-UserPrincipalName", $NewUPN
                                 "#Changing to user UPN from " + $allADuser_UPN + " to " + $NewUPN | out-file -append $RunOnPremises
-                                "Set-Aduser -identity " + $allADuser_GUID + " -UserPrincipalName " + $NewUPN | out-file -append $RunOnPremises
+                                "Set-Aduser -identity " + $allADuser_Sid + " -UserPrincipalName " + $NewUPN | out-file -append $RunOnPremises
 
                                 log -Status "INFORMATION" -Message "Action: Run the the following cmdlet on OnPremises Active Directory Powershell:"
                                 log -Status "INFORMATION" -Message "#Changing to user UPN from " + $allADuser_UPN + " to " + $NewUPN 
-                                log -Status "INFORMATION" -Message "Set-Aduser -identity " + $allADuser_GUID + " -UserPrincipalName " + $NewUPN
+                                log -Status "INFORMATION" -Message "Set-Aduser -identity " + $allADuser_Sid + " -UserPrincipalName " + $NewUPN
 
                             }
                             else
@@ -291,11 +291,12 @@ foreach ($allADuser in $allADusers)
             }
             catch
                 {
-
                 }
     }
 Write-Host
 Write-Host "Script finished successfully !!" -ForegroundColor Yellow
+log -Status "INFORMATION" -Message ""
 log -Status "INFORMATION" -Message "Script finished successfully !!"
 log -Status "INFORMATION" -Message "..:: COMPLETED ::.."
-$dateTime = Get-Date -Format dd/MM/yyyy-HH:mm:ss;Write-Host $dateTime
+$dateTime = Get-Date -Format dd/MM/yyyy-HH:mm:ss
+Write-Host $dateTime
