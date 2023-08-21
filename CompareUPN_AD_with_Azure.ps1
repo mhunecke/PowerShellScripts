@@ -207,10 +207,10 @@ ConnectMsol
 
 $TotalUsersCounter = 0
 $CountToChange = 0
-"#Run these cmdlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
-"#IMPORTANT: Replace the <contoso.com> string by your desired domain (must be a Microsoft 365 accepted domain)" | out-file -append $RunOnPremises
+"# Run these cmdlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
+"# IMPORTANT: Replace the <contoso.com> string by your desired domain (must be a Microsoft 365 accepted domain)" | out-file -append $RunOnPremises
 "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
-"#Run these cmdlets on Microsoft Online PowerShell | Connect-MSOL" | out-file $RunOnCloud
+"# Run these cmdlets on Microsoft Online PowerShell | Connect-MSOL" | out-file $RunOnCloud
 "#---------------------------------------------------------------------------" | out-file -append $RunOnCloud
 Write-Host "Reading OnPremises Active Directory Users...."
 log -Status "INFORMATION" -Message "Reading OnPremises Active Directory Users...."
