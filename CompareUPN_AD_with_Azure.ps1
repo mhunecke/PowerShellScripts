@@ -28,15 +28,24 @@
     FileName:       .\CompareUPN_AD_with_Azure.ps1
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
-    Last update:    Aug 21st, 2023
-    Version:        1.43
+    Last update:    Aug 24th, 2023
+    Version:        1.50
+
+    Changelog:
+    ==========
+    1.50 - Aug 24th, 2023
+        - Added the option to use the mail attribute as Alternative Logon ID.
+        - Ignore users with adminDescription attribute filled.
+        - Do not required to connect to Microsoft Graph anymore.
 #>
 
+#log files
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
 $RunOnPremises = "CompareUPN_AD_with_Azure_RunOnPremises_" + $DateTime + ".txt"
 $RunOnCloud = "CompareUPN_AD_with_Azure_RunOnCloud_" + $DateTime + ".txt"
 $logName = "CompareUPN_AD_with_Azure_ExecutionLog_" +  $DateTime + ".txt"
 $DomainToReplace = "contoso.com" #Domain to replace the current UPN
+$AlternativeLogonID_Atribute = "UserPrincipalName" #Attribute to be used as Alternative Logon ID (mail or userPrincipalName). If you don't know about Alternative Logon ID, maybe you ar not using. So, leave it as UserPrincipalName.
 
 #---------------------------------------------------------------------
 # Write the log
@@ -106,49 +115,6 @@ function ConnectAzureAD
 }
 
 #---------------------------------------------------------------------
-# Connect to MSGraph
-#---------------------------------------------------------------------
-function ConnectMSGraph
-{
-    try 
-        {
-            Write-Debug "Get-MgUser -ErrorAction stop"
-            $testConnection = Get-MgUser -ErrorAction stop | Out-Null #if true (Already Connected)
-            Write-Host "You are already connected to Microsoft Graph."
-            log -Status "INFORMATION" -Message "You are already connected to Microsoft Graph."
-        }
-        catch
-            {
-                try
-                    {
-                        write-Debug $error[0].Exception
-                        Write-Host "Connecting to Microsoft Graph..."
-                        log -Status "INFORMATION" -Message "Connecting to Microsoft Graph..."
-                        Connect-Graph -Scopes "User.Read.All" -ErrorAction stop | Out-Null
-                    }
-                    catch    
-                        {
-                            try
-                                {
-                                    write-Debug $error[0].Exception
-                                    Write-Host "Installing Microsoft Graph PowerShell Module..."
-                                    log -Status "INFORMATION" -Message "Installing Microsoft Graph PowerShell Module..."
-                                    Install-Module Microsoft.Graph -Force -AllowClobber
-                                    Connect-Graph -Scopes "User.Read.All" -ErrorAction stop | Out-Null
-                                }
-                                catch
-                                    {
-                                        write-Debug $error[0].Exception
-                                        Write-Host "Couldn't connect to Microosft Graph. Exiting."
-                                        log -Status "Error" -Message "Couldn't connect to Microosft Graph. Exiting."
-                                        Exit
-                                    }
-                       
-                        }
-            }
-}
-
-#---------------------------------------------------------------------
 # Connect to Microsoft Online
 #---------------------------------------------------------------------
 function ConnectMsol
@@ -202,7 +168,6 @@ $dateTime = Get-Date -Format dd/MM/yyyy-HH:mm:ss;Write-Host $dateTime
 log -Status "INFORMATION" -Message "..:: STARTED ::.."
 
 ConnectAzureAD
-ConnectMSGraph
 ConnectMsol
 
 $TotalUsersCounter = 0
@@ -216,8 +181,8 @@ Write-Host "Reading OnPremises Active Directory Users...."
 log -Status "INFORMATION" -Message "Reading OnPremises Active Directory Users...."
 #$FQDN_DC = "dc01.contoso.net" #FQDN of the OnPremises Active Directory Domain Controller
 #$Domain_OU_DN = "DC=contoso,DC=net" #OU Distinguished Name of the OnPremises Active Directory Domain
-#$allADusers = Get-ADUser -filter * -SearchBase $Domain_OU_DN -Server $FQDN_DC -Properties Mail, DisplayName, UserPrincipalName, objectSid | where-object {$_.mail -ne $null} | select-object DisplayName, UserPrincipalName, objectSid
-$allADusers = Get-ADUser -filter * -Properties Mail, DisplayName, UserPrincipalName, objectSid | where-object {$_.mail -ne $null} | select-object DisplayName, UserPrincipalName, objectSid
+#$allADusers = Get-ADUser -filter * -SearchBase $Domain_OU_DN -Server $FQDN_DC -Properties Mail, DisplayName, UserPrincipalName, objectSid, adminDescription | where-object {$_.mail -ne $null -and $_.adminDescription -eq $null} | select-object DisplayName, UserPrincipalName, objectSid, Mail
+$allADusers = Get-ADUser -filter * -Properties Mail, DisplayName, UserPrincipalName, objectSid, adminDescription | where-object {$_.mail -ne $null -and $_.adminDescription -eq $null} | select-object DisplayName, UserPrincipalName, objectSid, Mail
 $allADusersCount = $allADusers.count
 
 $AzureADDomains = Get-AzureADDomain | select-object Name
@@ -229,37 +194,47 @@ foreach ($allADuser in $allADusers)
 
         $allADuser_DisplayName = $allADuser.DisplayName
         $allADuser_UPN = $allADuser.UserPrincipalName
+        $allADuser_Mail = $allADuser.Mail
         $allADuser_Sid = $allADuser.objectSid.value
-        
+       
+        If ($AlternativeLogonID_Atribute -eq "UserprincipalName")
+            {
+                $allADuser_CompareAttribute = $allADuser_UPN
+                $attributeNameString = "UPN ----> "
+                $attributeNameCmdlet = "UserPrincipalName"
+            }
+            else
+                {
+                    $allADuser_CompareAttribute = $allADuser_Mail
+                    $attributeNameString = "Mail ---> "
+                    $attributeNameCmdlet = "Mail"
+                }
+
         Try
             {
                 $allAzureuser = Get-AzureADUser -Filter "OnPremisesSecurityIdentifier eq '$allADuser_Sid'" | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier #-ErrorAction Stop
                 $allAzureuser_UPN = $allAzureuser.userprincipalname
-                $allAzureuser_ObjectID = $allAzureuser.ObjectID
 
-                $allGraphsuser = Get-MgUser -UserId $allAzureuser_ObjectID -Property OnPremisesUserPrincipalName | select-object OnPremisesUserPrincipalName -ErrorAction Stop
-                $allGraphsuser_UPN = $allGraphsuser.OnPremisesUserPrincipalName
-
-                if ($allAzureuser_UPN -ne $allGraphsuser_UPN)
+                if ($allAzureuser_UPN -ne $allADuser_CompareAttribute)
                     {
                         $CountToChange++
                         Write-Host
                         Write-Host "#", $CountToChange
-                        Write-Host "Display Name ---------------> ", $allADuser_DisplayName -ForegroundColor Cyan
-                        Write-Host "Azure AD current UPN -------> ", $allAzureuser_UPN -ForegroundColor Cyan
-                        Write-Host "Graph OnPremises UPN -------> ", $allGraphsuser_UPN -ForegroundColor Cyan
+                        Write-Host "Display Name -----------------> ", $allADuser_DisplayName -ForegroundColor Cyan
+                        Write-Host "Azure AD UPN ---------> ", $allAzureuser_UPN -ForegroundColor Cyan
+                        Write-Host "OnPremises AD", $attributeNameString, $allADuser_CompareAttribute -ForegroundColor Cyan
                         
                         log -Status "INFORMATION" -Message ""
                         log -Status "INFORMATION" -Message "#", $CountToChange
-                        log -Status "INFORMATION" -Message "Display Name ---------------> ", $allADuser_DisplayName
-                        log -Status "INFORMATION" -Message "Azure AD current UPN -------> ", $allAzureuser_UPN
-                        log -Status "INFORMATION" -Message "Graph OnPremises UPN -------> ", $allGraphsuser_UPN
+                        log -Status "INFORMATION" -Message "Display Name -----------------> ", $allADuser_DisplayName
+                        log -Status "INFORMATION" -Message "Azure AD UPN ---------> ", $allAzureuser_UPN
+                        log -Status "INFORMATION" -Message "OnPremises AD", $attributeNameString, $allADuser_CompareAttribute
 
                         $isAcceptedDomain = $False
                         foreach ($AzureADDomain in $AzureADDomains)
                             {
                                 $AzureADDomain_Name = $AzureADDomain.Name
-                                if ($allGraphsuser_UPN -like "*$AzureADDomain_Name")
+                                if ($allADuser_CompareAttribute -like "*$AzureADDomain_Name")
                                     {
                                         $isAcceptedDomain = $True
                                     }
@@ -269,23 +244,23 @@ foreach ($allADuser in $allADusers)
                             {
                                 $NewUPN = $allADuser_UPN.split("@")[0] + "@" + $DomainToReplace
                                 Write-Host "Action: Run the the following cmdlet on OnPremises Active Directory Powershell:" -ForegroundColor Yellow
-                                Write-Host  "Set-Aduser -identity", $allADuser_Sid, "-UserPrincipalName", $NewUPN
-                                "#Changing to user UPN from " + $allADuser_UPN + " to " + $NewUPN | out-file -append $RunOnPremises
-                                "Set-Aduser -identity " + $allADuser_Sid + " -UserPrincipalName " + $NewUPN | out-file -append $RunOnPremises
+                                Write-Host  "Set-Aduser -identity", $allADuser_Sid, "-", $attributeNameCmdlet, " ", $NewUPN
+                                "#Changing the user " + $attributeNameCmdlet + " from " + $allADuser_UPN + " to " + $NewUPN | out-file -append $RunOnPremises
+                                "Set-Aduser -identity " + $allADuser_Sid + " -" + $attributeNameCmdlet + " " + $NewUPN | out-file -append $RunOnPremises
 
                                 log -Status "INFORMATION" -Message "Action: Run the the following cmdlet on OnPremises Active Directory Powershell:"
-                                log -Status "INFORMATION" -Message "#Changing to user UPN from " + $allADuser_UPN + " to " + $NewUPN 
-                                log -Status "INFORMATION" -Message "Set-Aduser -identity " + $allADuser_Sid + " -UserPrincipalName " + $NewUPN
+                                log -Status "INFORMATION" -Message "#Changing the user", $attributeNameCmdlet + "from" + $allADuser_UPN + "to" + $NewUPN
+                                log -Status "INFORMATION" -Message "Set-Aduser -identity", $allADuser_Sid, "-",$attributeNameCmdlet, $NewUPN
 
                             }
                             else
                                 {
                                     Write-Host "Action: Run the the following cmdlet on Microsoft Online (MSOL) Powershell:" -ForegroundColor Yellow
-                                    Write-Host "Set-MsolUserPrincipalName -UserPrincipalName", $allAzureuser_UPN, "-NewUserPrincipalName", $allGraphsuser_UPN
-                                    "Set-MsolUserPrincipalName -UserPrincipalName " + $allAzureuser_UPN + " -NewUserPrincipalName " + $allGraphsuser_UPN | out-file -append $RunOnCloud
+                                    Write-Host "Set-MsolUserPrincipalName -UserPrincipalName", $allAzureuser_UPN, "-NewUserPrincipalName", $allADuser_CompareAttribute
+                                    "Set-MsolUserPrincipalName -UserPrincipalName " + $allAzureuser_UPN + " -NewUserPrincipalName " + $allADuser_CompareAttribute | out-file -append $RunOnCloud
 
                                     log -Status "INFORMATION" -Message "Action: Run the the following cmdlet on Microsoft Online (MSOL) Powershell:"
-                                    log -Status "INFORMATION" -Message "Set-MsolUserPrincipalName -UserPrincipalName", $allAzureuser_UPN, "-NewUserPrincipalName", $allGraphsuser_UPN
+                                    log -Status "INFORMATION" -Message "Set-MsolUserPrincipalName -UserPrincipalName", $allAzureuser_UPN, "-NewUserPrincipalName", $allADuser_CompareAttribute
                                 }
                     }
             }
