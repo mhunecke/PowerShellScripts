@@ -28,8 +28,13 @@
     FileName:       .\CompareUPN_Azure_with_AD.ps1
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
-    Last update:    Aug 21st, 2023
-    Version:        1.43
+    Last update:    Aug 24th, 2023
+    Version:        1.50
+
+    Changelog:
+    ==========
+    1.50 - Aug 24th, 2023
+        - Ignore "Sync_<GUID>" users. This users are created by Azure AD Connect and are not synced from OnPremises Active Directory.
 #>
 
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
@@ -124,7 +129,7 @@ $CountToChange = 0
 "#---------------------------------------------------------------------------" | out-file -append $RunOnCloud
 Write-Host "Reading Azure AD Users... (wait around 10 minutes for each 10k Azure AD users) !!"
 log -Status "INFORMATION" -Message "Reading Azure AD Users... (wait around 10 minutes for each 10k Azure AD users) !!"
-$allAzureADusers = Get-AzureADUser -all:$true | Where-Object {($_.DirSyncEnabled -eq $true) -and ($_.UserType -eq "Member")}  | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier, DisplayName, OnPremisesDistinguishedName
+$allAzureADusers = Get-AzureADUser -all:$true | Where-Object {$_.DirSyncEnabled -eq $true -and $_.UserType -eq "Member" -and $_.UserPrincipalName -notlike "Sync_*"} | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier, DisplayName, OnPremisesDistinguishedName
 $allAzureADusersCount = $allAzureADusers.count
 
 foreach ($allAzureADuser in $allAzureADusers)
