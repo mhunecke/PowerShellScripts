@@ -28,23 +28,26 @@
     FileName:       .\CompareUPN_AD_with_Azure.ps1
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
-    Last update:    Aug 24th, 2023
-    Version:        1.50
+    Last update:    Aug 30th, 2023
+    Version:        1.50a
 
     Changelog:
     ==========
-    1.50 - Aug 24th, 2023
+    1.50 - Aug 23th, 2023
         - Added the option to use the mail attribute as Alternative Logon ID.
         - Ignore users with adminDescription attribute filled.
-        - Do not required to connect to Microsoft Graph anymore.
+        - Do not required to connecting to Microsoft Graph anymore (speed up the script).
+    1.51 - Aug 24th, 2023
+        - Ignore the users located in OU that are configured to do not sync with Office 365.
 #>
 
-#log files
+#log files variables
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
 $RunOnPremises = "CompareUPN_AD_with_Azure_RunOnPremises_" + $DateTime + ".txt"
 $RunOnCloud = "CompareUPN_AD_with_Azure_RunOnCloud_" + $DateTime + ".txt"
 $logName = "CompareUPN_AD_with_Azure_ExecutionLog_" +  $DateTime + ".txt"
-$DomainToReplace = "contoso.com" #Domain to replace the current UPN
+#Your environment variables 
+$DomainToReplace = "contoso.com" #Replace the <contoso.com> string by your desired domain (must be a Microsoft 365 accepted domain).
 $AlternativeLogonID_Atribute = "UserPrincipalName" #Attribute to be used as Alternative Logon ID (mail or userPrincipalName). If you don't know about Alternative Logon ID, maybe you ar not using. So, leave it as UserPrincipalName.
 
 #---------------------------------------------------------------------
@@ -182,7 +185,7 @@ log -Status "INFORMATION" -Message "Reading OnPremises Active Directory Users...
 #$FQDN_DC = "dc01.contoso.net" #FQDN of the OnPremises Active Directory Domain Controller
 #$Domain_OU_DN = "DC=contoso,DC=net" #OU Distinguished Name of the OnPremises Active Directory Domain
 #$allADusers = Get-ADUser -filter * -SearchBase $Domain_OU_DN -Server $FQDN_DC -Properties Mail, DisplayName, UserPrincipalName, objectSid, adminDescription | where-object {$_.mail -ne $null -and $_.adminDescription -eq $null} | select-object DisplayName, UserPrincipalName, objectSid, Mail
-$allADusers = Get-ADUser -filter * -Properties Mail, DisplayName, UserPrincipalName, objectSid, adminDescription | where-object {$_.mail -ne $null -and $_.adminDescription -eq $null} | select-object DisplayName, UserPrincipalName, objectSid, Mail
+$allADusers = Get-ADUser -filter * -Properties Mail, DisplayName, UserPrincipalName, objectSid, distinguishedName, adminDescription | where-object {$_.mail -ne $null -and $_.adminDescription -eq $null} | select-object Mail, DisplayName, UserPrincipalName, objectSid, distinguishedName
 $allADusersCount = $allADusers.count
 
 $AzureADDomains = Get-AzureADDomain | select-object Name
@@ -192,21 +195,23 @@ foreach ($allADuser in $allADusers)
         $PercentComplete = ($TotalUsersCounter / $allADusersCount) * 100
         Write-Progress -Activity 'Reading user attributes...' -Status "$TotalUsersCounter users of $allADusersCount users already checked." -PercentComplete $PercentComplete
 
+        $allADuser_Mail = $allADuser.Mail
         $allADuser_DisplayName = $allADuser.DisplayName
         $allADuser_UPN = $allADuser.UserPrincipalName
-        $allADuser_Mail = $allADuser.Mail
-        $allADuser_Sid = $allADuser.objectSid.value
+        $allADuser_Sid = $allADuser.ObjectSid.value
+        $allADuser_DN = $allADuser.DistinguishedName
+        
        
         If ($AlternativeLogonID_Atribute -eq "UserprincipalName")
             {
                 $allADuser_CompareAttribute = $allADuser_UPN
-                $attributeNameString = "UPN ----> "
+                $attributeNameString = "UserPrincipalName ---> "
                 $attributeNameCmdlet = "UserPrincipalName"
             }
             else
                 {
                     $allADuser_CompareAttribute = $allADuser_Mail
-                    $attributeNameString = "Mail ---> "
+                    $attributeNameString = "Mail ----------------> "
                     $attributeNameCmdlet = "Mail"
                 }
 
@@ -215,20 +220,22 @@ foreach ($allADuser in $allADusers)
                 $allAzureuser = Get-AzureADUser -Filter "OnPremisesSecurityIdentifier eq '$allADuser_Sid'" | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier #-ErrorAction Stop
                 $allAzureuser_UPN = $allAzureuser.userprincipalname
 
-                if ($allAzureuser_UPN -ne $allADuser_CompareAttribute)
+                if ($allAzureuser_UPN -ne $allADuser_CompareAttribute -and $null -ne $allAzureuser_UPN)
                     {
                         $CountToChange++
                         Write-Host
                         Write-Host "#", $CountToChange
-                        Write-Host "Display Name -----------------> ", $allADuser_DisplayName -ForegroundColor Cyan
-                        Write-Host "Azure AD UPN ---------> ", $allAzureuser_UPN -ForegroundColor Cyan
+                        Write-Host "Display Name ----------------------> ", $allADuser_DisplayName -ForegroundColor Cyan
+                        Write-Host "Azure AD UserPrincipalName --------> ", $allAzureuser_UPN -ForegroundColor Cyan
                         Write-Host "OnPremises AD", $attributeNameString, $allADuser_CompareAttribute -ForegroundColor Cyan
-                        
+                        Write-Host "OnPremises AD DistinguishedName ---> ", $allADuser_DN -ForegroundColor Cyan
+
                         log -Status "INFORMATION" -Message ""
                         log -Status "INFORMATION" -Message "#", $CountToChange
-                        log -Status "INFORMATION" -Message "Display Name -----------------> ", $allADuser_DisplayName
-                        log -Status "INFORMATION" -Message "Azure AD UPN ---------> ", $allAzureuser_UPN
+                        log -Status "INFORMATION" -Message "Display Name ----------------------> ", $allADuser_DisplayName
+                        log -Status "INFORMATION" -Message "Azure AD UPN ----------------------> ", $allAzureuser_UPN
                         log -Status "INFORMATION" -Message "OnPremises AD", $attributeNameString, $allADuser_CompareAttribute
+                        log -Status "INFORMATION" -Message "OnPremises AD DistinguishedName ---> ", $allADuser_DN
 
                         $isAcceptedDomain = $False
                         foreach ($AzureADDomain in $AzureADDomains)
@@ -244,7 +251,7 @@ foreach ($allADuser in $allADusers)
                             {
                                 $NewUPN = $allADuser_UPN.split("@")[0] + "@" + $DomainToReplace
                                 Write-Host "Action: Run the the following cmdlet on OnPremises Active Directory Powershell:" -ForegroundColor Yellow
-                                Write-Host  "Set-Aduser -identity", $allADuser_Sid, "-", $attributeNameCmdlet, " ", $NewUPN
+                                Write-Host  "Set-Aduser -identity", $allADuser_Sid, "-",$attributeNameCmdlet, $NewUPN
                                 "#Changing the user " + $attributeNameCmdlet + " from " + $allADuser_UPN + " to " + $NewUPN | out-file -append $RunOnPremises
                                 "Set-Aduser -identity " + $allADuser_Sid + " -" + $attributeNameCmdlet + " " + $NewUPN | out-file -append $RunOnPremises
 
