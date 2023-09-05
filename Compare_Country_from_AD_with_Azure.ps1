@@ -28,12 +28,14 @@
     FileName:       .\Compare_Country_from_AD_with_Azure.ps1
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Sep 09th, 2023
-    Last update:    Sep 09th, 2023
-    Version:        1.50
+    Last update:    Sep 11th, 2023
+    Version:        1.51
 
     Changelog:
     ==========
-    1.51 - Sep xxth, 2023
+    1.51 - Sep 11th, 2023
+        - Fix same minor issues
+        - Discard in the output file users that are not in Azure AD
 #>
 
 #log files variables
@@ -167,7 +169,7 @@ ConnectAzureAD
 
 $TotalUsersCounter = 0
 $UsersToChangeCounter = 0
-"# Run these cmdlets on Microsoft Online PowerShell | Connect-MSOL" | out-file $RunOnCloud
+"# Run these cmdlets on Azure AD PowerShell | Connect-AzureAD" | out-file $RunOnCloud
 "#---------------------------------------------------------------------------" | out-file -append $RunOnCloud
 Write-Host "Reading OnPremises Active Directory Users...."
 log -Status "INFORMATION" -Message "Reading OnPremises Active Directory Users...."
@@ -193,9 +195,10 @@ foreach ($allADuser in $allADusers)
             {
                 $allAzureuser = Get-AzureADUser -Filter "OnPremisesSecurityIdentifier eq '$allADuser_Sid'" | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier, UsageLocation
                 #$allAzureuser_UPN = $allAzureuser.userprincipalname
+                $allAzureuser_ObjectID = $allAzureuser.ObjectID
                 $allAzureuser_Country = $allAzureuser.UsageLocation
 
-                if ($allADuser_Country -ne $allAzureuser_Country)
+                if (($allADuser_Country -ne $allAzureuser_Country) -and ($null -ne $allAzureuser_ObjectID))
                     {
                         $UsersToChangeCounter++
                         Write-Host
@@ -205,8 +208,8 @@ foreach ($allADuser in $allADusers)
                         Write-Host "Country on OnPremises AD ----------> ", $allADuser_Country -ForegroundColor Cyan
                         Write-Host "Country on Azure AD ---------------> ", $allAzureuser_Country -ForegroundColor Cyan
                         Write-Host "Action: Run the the following cmdlet on Azure AD Powershell:" -ForegroundColor Yellow
-                        Write-Host "Set-AzureADUser -UsageLocation", $allADuser_Country
-                        "Set-AzureADUser -UsageLocation " + $allADuser_Country | out-file -append $RunOnCloud
+                        Write-Host "Set-AzureADUser -ObjectID", $allAzureuser_ObjectID , "-UsageLocation", $allADuser_Country
+                        "Set-AzureADUser -ObjectID" + $allAzureuser_ObjectID + " -UsageLocation " + $allADuser_Country | out-file -append $RunOnCloud
 
                         log -Status "INFORMATION" -Message ""
                         log -Status "INFORMATION" -Message "#", $UsersToChangeCounter
@@ -216,7 +219,7 @@ foreach ($allADuser in $allADusers)
                         log -Status "INFORMATION" -Message "Country on Azure AD ---------------> ", $allAzureuser_Country
 
                         log -Status "INFORMATION" -Message "Action: Run the the following cmdlet on Azure AD Powershell:"
-                        log -Status "INFORMATION" -Message "Set-AzureADUser -UsageLocation", $allADuser_Country
+                        log -Status "INFORMATION" -Message "Set-AzureADUser -ObjectID", $allAzureuser_ObjectID, "-UsageLocation", $allADuser_Country
 
                     }
             }
