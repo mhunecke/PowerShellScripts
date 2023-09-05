@@ -1,8 +1,8 @@
 <#
 .Synopsis
-    Script to collect all the orphan users in Azure AD. Users created by sync from AD, but the users does not exist in AD anymore.
+    Script to compare the Country from OnPremises Active Directory with Azure AD.
 .DESCRIPTION
-    Script to collect all the orphan users in Azure AD. Users created by sync from AD, but the users does not exist in AD anymore.
+    Script to compare the Country from OnPremises Active Directory with Azure AD.
 
     Disclaimer:
     ===========
@@ -25,25 +25,22 @@
     interruption, loss of business information, or other pecuniary loss) arising out of the use of or inability to use
     the sample scripts or documentation, even if Microsoft has been advised of the possibility of such damages.
 
-    FileName:       .\Collect_Orphan_Azure_Objects.ps1
+    FileName:       .\Compare_Country_from_AD_with_Azure.ps1
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
-    Creation date:  Aug 10th, 2023
+    Creation date:  Sep 09th, 2023
     Last update:    Sep 09th, 2023
-    Version:        1.50a
+    Version:        1.50
 
     Changelog:
     ==========
-    1.50 - Aug 24th, 2023
-        - Ignore "Sync_<GUID>" users. This users are created by Azure AD Connect and are not synced from OnPremises Active Directory.
-    1.50a - Sep 09th, 2023
-        - Rename the script to Collect_Orphan_Azure_Objects.ps1
-        - Change some variable names, just for standardization
+    1.51 - Sep xxth, 2023
 #>
 
+#log files variables
 $DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
-$RunOnPremises = "Collect_Orphan_Azure_Objects_RunOnPremises_" + $DateTime + ".txt"
-$RunOnCloud = "Collect_Orphan_Azure_Objects_RunOnCloud_" + $DateTime + ".txt"
-$logName = "Collect_Orphan_Azure_Objects_ExecutionLog_" +  $DateTime + ".txt"
+$RunOnCloud = "Compare_Country_from_AD_with_Azure_RunOnCloud_" + $DateTime + ".txt"
+$DateTime = Get-Date -Format yyyy_M_d@HH_mm_ss
+$logName = "Compare_Country_from_AD_with_Azure_ExecutionLog_" +  $DateTime + ".txt"
 
 #---------------------------------------------------------------------
 # Write the log
@@ -113,6 +110,49 @@ function ConnectAzureAD
 }
 
 #---------------------------------------------------------------------
+# Connect to Microsoft Online
+#---------------------------------------------------------------------
+function ConnectMsol
+{
+    try 
+        {
+            Write-Debug "Get-MSOLCompanyInformation -ErrorAction stop"
+            $testConnection = Get-MSOLCompanyInformation -ErrorAction stop | Out-Null #if true (Already Connected)
+            Write-Host "You are already connected to Microsoft Online..."
+            log -Status "INFORMATION" -Message "You are already connected to Microsoft Online."
+        }
+        catch
+            {
+                try
+                    {
+                        write-Debug $error[0].Exception
+                        Write-Host "Connecting to Microsoft Online..."
+                        log -Status "INFORMATION" -Message "Connecting to Microsoft Online."
+                        Connect-MSOLService -ErrorAction stop | Out-Null
+                    }
+                    catch    
+                        {
+                            try
+                                {
+                                    write-Debug $error[0].Exception
+                                    Write-Host "Installing Microsoft Online PowerShell Module..."
+                                    log -Status "INFORMATION" -Message Write-Host "Installing Microsoft Online PowerShell Module..."
+                                    Install-Module MSOnline -Force -AllowClobber -ErrorAction stop | Out-Null
+                                    Connect-MSOLService -ErrorAction stop | Out-Null
+                                }
+                                catch
+                                    {
+                                        write-Debug $error[0].Exception
+                                        Write-Host "Couldn't connect to  Microsoft Online. Exiting."
+                                        log -Status "Error" -Message "Couldn't connect to  Microsoft Online. Exiting."
+                                        exit
+                                    }
+                    
+                        }
+            }
+}
+
+#---------------------------------------------------------------------
 # Script start here
 #---------------------------------------------------------------------
 
@@ -123,57 +163,68 @@ $dateTime = Get-Date -Format dd/MM/yyyy-HH:mm:ss;Write-Host $dateTime
 log -Status "INFORMATION" -Message "..:: STARTED ::.."
 
 ConnectAzureAD
+#ConnectMsol
 
 $TotalUsersCounter = 0
 $UsersToChangeCounter = 0
-"# Run these cmdlets on OnPremises Active Directory PowerShell" | out-file $RunOnPremises
-"#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
 "# Run these cmdlets on Azure AD PowerShell | Connect-AzureAD" | out-file $RunOnCloud
 "#---------------------------------------------------------------------------" | out-file -append $RunOnCloud
-Write-Host "Reading Azure AD Users... (wait around 10 minutes for each 10k Azure AD users) !!"
-log -Status "INFORMATION" -Message "Reading Azure AD Users... (wait around 10 minutes for each 10k Azure AD users) !!"
-$allAzureADusers = Get-AzureADUser -all:$true | Where-Object {$_.DirSyncEnabled -eq $true -and $_.UserType -eq "Member" -and $_.UserPrincipalName -notlike "Sync_*"} | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier, DisplayName, OnPremisesDistinguishedName
-$allAzureADusersCount = $allAzureADusers.count
+Write-Host "Reading OnPremises Active Directory Users...."
+log -Status "INFORMATION" -Message "Reading OnPremises Active Directory Users...."
+#$FQDN_DC = "dc01.contoso.net" #FQDN of the OnPremises Active Directory Domain Controller
+#$Domain_OU_DN = "DC=contoso,DC=net" #OU Distinguished Name of the OnPremises Active Directory Domain
+#$allADusers = Get-ADUser -filter * -SearchBase $Domain_OU_DN -Server $FQDN_DC -Properties Mail, DisplayName, UserPrincipalName, objectSid, adminDescription | where-object {$_.mail -ne $null -and $_.adminDescription -eq $null} | select-object DisplayName, UserPrincipalName, objectSid, Mail
+$allADusers = Get-ADUser -filter * -Properties Mail, DisplayName, UserPrincipalName, objectSid, distinguishedName, adminDescription, c | where-object {$_.mail -ne $null -and $_.adminDescription -eq $null} | select-object Mail, DisplayName, UserPrincipalName, objectSid, distinguishedName, C
+$allADusersCount = $allADusers.count
 
-foreach ($allAzureADuser in $allAzureADusers)
-    { 
+foreach ($allADuser in $allADusers)
+    {
         $TotalUsersCounter++
-        $PercentComplete = ($TotalUsersCounter / $allAzureADusersCount) * 100
-        Write-Progress -Activity 'Reading user attributes...' -Status "$TotalUsersCounter users of $allAzureADusersCount users already checked." -PercentComplete $PercentComplete
+        $PercentComplete = ($TotalUsersCounter / $allADusersCount) * 100
+        Write-Progress -Activity 'Reading user attributes...' -Status "$TotalUsersCounter users of $allADusersCount users already checked." -PercentComplete $PercentComplete
+
+        $allADuser_Country = $allADuser.c
+        $allADuser_DisplayName = $allADuser.DisplayName
+        $allADuser_UPN = $allADuser.UserPrincipalName
+        $allADuser_Sid = $allADuser.ObjectSid.value
+        $allADuser_DN = $allADuser.DistinguishedName
         
-        $allAzureADuser_UPN = $allAzureADuser.UserPrincipalName
-        $allAzureADuser_ObjectID = $allAzureADuser.ObjectID
-        $allAzureADuser_OnPremSID = $allAzureADuser.OnPremisesSecurityIdentifier
-        $allAzureADuser_DisplayName = $allAzureADuser.DisplayName
-        try
+        Try
             {
-                $allADOnPremUser = Get-ADUser -identity $allAzureADuser_OnPremSID -Properties ObjectGUID | select-object UserPrincipalName, ObjectGUID # -ErrorAction Stop
+                $allAzureuser = Get-AzureADUser -Filter "OnPremisesSecurityIdentifier eq '$allADuser_Sid'" | select-object UserPrincipalName, ObjectID, OnPremisesSecurityIdentifier, UsageLocation
+                #$allAzureuser_UPN = $allAzureuser.userprincipalname
+                $allAzureuser_Country = $allAzureuser.UsageLocation
+
+                if ($allADuser_Country -ne $allAzureuser_Country)
+                    {
+                        $UsersToChangeCounter++
+                        Write-Host
+                        Write-Host "#", $UsersToChangeCounter
+                        Write-Host "Display Name ----------------------> ", $allADuser_DisplayName -ForegroundColor Cyan
+                        Write-Host "DistinguishedName -----------------> ", $allADuser_DN -ForegroundColor Cyan
+                        Write-Host "Country on OnPremises AD ----------> ", $allADuser_Country -ForegroundColor Cyan
+                        Write-Host "Country on Azure AD ---------------> ", $allAzureuser_Country -ForegroundColor Cyan
+                        Write-Host "Action: Run the the following cmdlet on Azure AD Powershell:" -ForegroundColor Yellow
+                        Write-Host "Set-AzureADUser", $allADuser_UPN , "-UsageLocation", $allADuser_Country
+                        "Set-AzureADUser " + $allADuser_UPN + " -UsageLocation " + $allADuser_Country | out-file -append $RunOnCloud
+
+                        log -Status "INFORMATION" -Message ""
+                        log -Status "INFORMATION" -Message "#", $UsersToChangeCounter
+                        log -Status "INFORMATION" -Message "Display Name ----------------------> ", $allADuser_DisplayName
+                        log -Status "INFORMATION" -Message "DistinguishedName -----------------> ", $allADuser_DN
+                        log -Status "INFORMATION" -Message "Country on OnPremises AD ----------> ", $allADuser_Country
+                        log -Status "INFORMATION" -Message "Country on Azure AD ---------------> ", $allAzureuser_Country
+
+                        log -Status "INFORMATION" -Message "Action: Run the the following cmdlet on Azure AD Powershell:"
+                        log -Status "INFORMATION" -Message "Set-AzureADUser", $allADuser_UPN, "-UsageLocation", $allADuser_Country
+
+                    }
             }
             catch
                 {
-                    $UsersToChangeCounter++
-                    Write-Host
-                    Write-Host "#", $UsersToChangeCounter
-                    Write-Host "Azure AD Display Name --------> ", $allAzureADuser_DisplayName -ForegroundColor Cyan
-                    Write-Host "Azure AD current UPN ---------> ", $allAzureADuser_UPN -ForegroundColor Cyan
-                    "Get-ADUser -Identity '" + $allAzureADuser_DisplayName + "'" | out-file -append $RunOnPremises
-                    "Get-ADUser -Identity '" + $allAzureADuser_UPN + "'" | out-file -append $RunOnPremises
-                    "Get-ADUser -Identity '" + $allAzureADuser_OnPremSID + "'" | out-file -append $RunOnPremises
-                    "#---------------------------------------------------------------------------" | out-file -append $RunOnPremises
-                    Write-Host "Action: Run the the following cmdlet on Azure AD PowerShell:" -ForegroundColor Yellow
-                    Write-Host "Remove-AzureADuser -ObjectID", $allAzureADuser_ObjectID
-                    "Remove-AzureADuser -ObjectID " + $allAzureADuser_ObjectID | out-file -append $RunOnCloud
-
-                    log -Status "INFORMATION" -Message ""
-                    log -Status "INFORMATION" -Message "#", $UsersToChangeCounter
-                    log -Status "INFORMATION" -Message "Azure AD Display Name --------> ", $allAzureADuser_DisplayName
-                    log -Status "INFORMATION" -Message "Azure AD current UPN ---------> ", $allAzureADuser_UPN
-                    log -Status "INFORMATION" -Message "Action: Run the the following cmdlet on Azure AD PowerShell:"
-                    log -Status "INFORMATION" -Message "Remove-AzureADuser -ObjectID", $allAzureADuser_ObjectID
                 }
     }
-
-Write-Host 
+Write-Host
 Write-Host "Script finished successfully !!" -ForegroundColor Yellow
 log -Status "INFORMATION" -Message ""
 log -Status "INFORMATION" -Message "Script finished successfully !!"
