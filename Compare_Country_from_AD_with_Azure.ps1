@@ -209,7 +209,7 @@ foreach ($allADuser in $allADusers)
                         Write-Host "Country on Azure AD ---------------> ", $allAzureuser_Country -ForegroundColor Cyan
                         Write-Host "Action: Run the the following cmdlet on Azure AD Powershell:" -ForegroundColor Yellow
                         Write-Host "Set-AzureADUser -ObjectID", $allAzureuser_ObjectID , "-UsageLocation", $allADuser_Country
-                        "Set-AzureADUser -ObjectID" + $allAzureuser_ObjectID + " -UsageLocation " + $allADuser_Country | out-file -append $RunOnCloud
+                        "Set-AzureADUser -ObjectID " + $allAzureuser_ObjectID + " -UsageLocation " + $allADuser_Country | out-file -append $RunOnCloud
 
                         log -Status "INFORMATION" -Message ""
                         log -Status "INFORMATION" -Message "#", $UsersToChangeCounter
