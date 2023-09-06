@@ -29,7 +29,7 @@
     Author:         Marcelo Hunecke - Microsoft (mhunecke@microsoft.com)
     Creation date:  Aug 10th, 2023
     Last update:    Sep 09th, 2023
-    Version:        1.50a
+    Version:        1.51
 
     Changelog:
     ==========
@@ -37,7 +37,7 @@
         - Added the option to use the mail attribute as Alternative Logon ID.
         - Ignore users with adminDescription attribute filled.
         - Do not required to connecting to Microsoft Graph anymore (speed up the script).
-    1.50a - Sep 24th, 2023
+    1.51 - Sep 24th, 2023
         - Ignore the users located in OU that are configured to do not sync with Office 365.
         - Rename the script to Compare_UPN_from_AD_with_Azure.ps1
         - Change some variable names, just for standardization
